@@ -73,6 +73,8 @@ struct async_context {
 
     int modules_initialized;
     const struct sxplayer_ctx *s;
+
+    int pop_flags;
 };
 
 static int fetch_mod_info(struct async_context *actx)
@@ -300,6 +302,7 @@ int async_init(struct async_context *actx, const struct sxplayer_ctx *s)
     actx->s = s; // :(
     actx->thread_stack_size = s->thread_stack_size;
     actx->request_seek = AV_NOPTS_VALUE;
+    actx->pop_flags = s->non_blocking ? AV_THREAD_MESSAGE_NONBLOCK : 0;
 
     TRACE(actx, "allocate queues");
     if ((ret = alloc_msg_queue(&actx->info_channel, 1))                 < 0 ||
@@ -495,8 +498,10 @@ int async_pop_msg(struct async_context *actx, struct message *msg)
         return ret;
 
     TRACE(actx, "fetching a message from the sink");
-    ret = av_thread_message_queue_recv(actx->sink_queue, msg, 0);
+    ret = av_thread_message_queue_recv(actx->sink_queue, msg, actx->pop_flags);
     if (ret < 0) {
+        if ((actx->pop_flags & AV_THREAD_MESSAGE_NONBLOCK) && ret == AVERROR(EAGAIN))
+            return ret;
         TRACE(actx, "couldn't fetch message from sink because %s", av_err2str(ret));
         av_thread_message_queue_set_err_send(actx->sink_queue, ret);
         actx->need_wait = 1;
