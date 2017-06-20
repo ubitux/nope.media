@@ -104,6 +104,7 @@ int sxpi_demuxing_init(void *log_ctx,
                        const struct sxplayer_opts *opts)
 {
     int i, ret;
+    int related_stream = -1;
     enum AVMediaType media_type;
 
     ctx->log_ctx = log_ctx;
@@ -146,8 +147,23 @@ int sxpi_demuxing_init(void *log_ctx,
         return ret;
     }
 
+    /* If the user requests a program, pick the first stream in that program
+     * to use it as related stream for the call to av_find_best_stream() */
+    if (opts->program_id >= 0) {
+        for (i = 0; i < ctx->fmt_ctx->nb_programs; i++) {
+            if (ctx->fmt_ctx->programs[i]->id == opts->program_id) {
+                const AVProgram *program = ctx->fmt_ctx->programs[i];
+                if (program && program->nb_stream_indexes)
+                    related_stream = program->stream_index[0];
+                break;
+            }
+        }
+        if (related_stream == -1)
+            LOG(ctx, ERROR, "Could not find program %d", opts->program_id);
+    }
+
     TRACE(ctx, "find best stream");
-    ret = av_find_best_stream(ctx->fmt_ctx, media_type, -1, -1, NULL, 0);
+    ret = av_find_best_stream(ctx->fmt_ctx, media_type, -1, related_stream, NULL, 0);
     if (ret < 0) {
         LOG(ctx, ERROR, "Unable to find a %s stream in the input file",
             av_get_media_type_string(media_type));

@@ -168,6 +168,7 @@ void sxplayer_set_log_callback(struct sxplayer_ctx *s, void *arg, sxplayer_log_c
  *   max_pixels               integer   maximum number of pixels per frame
  *   audio_texture            integer   output audio as a video texture
  *   vt_pix_fmt               string    VideoToolbox pixel format in the CVPixelBufferRef ("bgra" or "nv12")
+ *   program_id               integer   select the program from which to pick the stream (useful for formats like HLS with typically multiple bitrate settings)
  */
 int sxplayer_set_option(struct sxplayer_ctx *s, const char *key, ...);
 
