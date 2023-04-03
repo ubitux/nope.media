@@ -106,8 +106,7 @@ int sxpi_decoding_init(void *log_ctx,
 #define DUMP_INFO(par, name) do {                                       \
     if ((par)->codec_type == AVMEDIA_TYPE_AUDIO) {                      \
         char chl[1024];                                                 \
-        av_get_channel_layout_string(chl, sizeof(chl), 0,               \
-                                     (par)->channel_layout);            \
+        av_channel_layout_describe(&(par)->ch_layout, chl, sizeof(chl));\
         TRACE(ctx, name " stream: %s %s @ %dHz tb=%d/%d",               \
               chl, av_get_sample_fmt_name((par)->format),               \
               (par)->sample_rate,                                       \

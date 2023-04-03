@@ -216,13 +216,14 @@ static int setup_filtergraph(struct filtering_ctx *ctx)
                  time_base.num, time_base.den,
                  codecpar->sample_aspect_ratio.num, codecpar->sample_aspect_ratio.den);
     } else {
-        snprintf(args, sizeof(args), "time_base=%d/%d:sample_rate=%d:sample_fmt=%s",
-                 time_base.num, time_base.den, codecpar->sample_rate,
-                 av_get_sample_fmt_name(codecpar->format));
-        if (codecpar->channel_layout)
-            av_strlcatf(args, sizeof(args), ":channel_layout=0x%"PRIx64, codecpar->channel_layout);
-        else
-            av_strlcatf(args, sizeof(args), ":channels=%d", codecpar->channels);
+        ret = snprintf(args, sizeof(args), "time_base=%d/%d:sample_rate=%d:sample_fmt=%s:channel_layout=",
+                       time_base.num, time_base.den, codecpar->sample_rate,
+                       av_get_sample_fmt_name(codecpar->format));
+        if (ret < 0) {
+            ret = AVERROR(EINVAL);
+            goto end;
+        }
+        av_channel_layout_describe(&codecpar->ch_layout, args + ret, sizeof(args) - ret);
     }
 
     TRACE(ctx, "graph buffer source args: %s", args);
