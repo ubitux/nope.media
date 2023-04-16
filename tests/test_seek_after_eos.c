@@ -19,12 +19,28 @@ int main(int ac, char **av)
     const int use_pkt_duration = ac > 3 ? atoi(av[3]) : 0;
 
     int ret = 0, nb_frames = 0;
-    struct nmd_ctx *s = nmd_create(filename);
     struct nmd_frame *frame = NULL;
     static const float ts[] = { 0.0, 0.5, 7.65 };
 
+    struct nmd_ctx *ctx = nmd_create();
+    if (!ctx)
+        return -1;
+
+    struct nmd_media *s = nmd_add_media(ctx, filename);
     if (!s)
         return -1;
+
+    struct nmd_media medias[4 * sizeof(ts)/sizeof(*ts)];
+
+    int idx = 0;
+    for (int k = 0; k < 4; k++) {
+        for (int j = 0; j < sizeof(ts)/sizeof(*ts); j++) {
+            medias[idx] = nmd_add_file(ctx, filename);
+            if (!medias[idx])
+                return -1;
+            idx++;
+        }
+    }
 
     const double skip     = (flags & FLAG_SKIP)     ? 60.0 : 0.0;
     const double end_time = (flags & FLAG_END_TIME) ? 70.0 : -1.0;
@@ -47,13 +63,9 @@ int main(int ac, char **av)
         nb_frames++;
     }
 
-    nmd_free(&s);
-
     for (int k = 0; k < 4; k++) {
         for (int j = 0; j < sizeof(ts)/sizeof(*ts); j++) {
-            s = nmd_create(filename);
-            if (!s)
-                return -1;
+            s = medias[idx++];
 
             nmd_set_option(s, "auto_hwaccel", 0);
             nmd_set_option(s, "avselect", avselect);
@@ -98,12 +110,11 @@ int main(int ac, char **av)
                 frame = NULL;
             }
             nmd_release_frame(frame);
-            nmd_free(&s);
         }
     }
 
 done:
-    nmd_free(&s);
+    nmd_free(&ctx);
 
     return ret;
 }

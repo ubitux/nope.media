@@ -37,15 +37,14 @@
 #include "log.h"
 #include "internal.h"
 
-struct nmd_ctx {
+struct nmd_media {
     const AVClass *class;                   // necessary for the AVOption mechanism
-    struct log_ctx *log_ctx;
+
     char *filename;                         // input filename
     char *logname;
 
     struct nmdi_opts opts;
 
-    struct async_context *actx;
     int context_configured;
 
     AVFrame *cached_frame;
@@ -60,6 +59,17 @@ struct nmd_ctx {
 
     int64_t entering_time;
     const char *cur_func_name;
+};
+
+struct nmd_ctx {
+    const AVClass *class;
+
+    struct log_ctx *log_ctx;
+
+    struct async_context **actx;
+
+    struct nmd_media **medias;
+    size_t nb_medias;
 };
 
 #define OFFSET(x) offsetof(struct nmd_ctx, opts.x)
@@ -97,7 +107,12 @@ static const AVClass class = {
     .option     = options,
 };
 
-int nmd_set_option(struct nmd_ctx *s, const char *key, ...)
+static const AVClass ctx_class = {
+    .class_name = "nope.media",
+    .item_name  = "control",
+};
+
+int nmd_media_set_option(struct nmd_media *s, const char *key, ...)
 {
     va_list ap;
     int n, ret = 0;
@@ -150,10 +165,15 @@ static void free_context(struct nmd_ctx *s)
 {
     if (!s)
         return;
-    av_freep(&s->filename);
-    av_freep(&s->logname);
+    for (size_t i = 0; i < nb_medias; i++) {
+        struct nmd_media *m = s->medias[i];
+        av_freep(&m->filename);
+        av_freep(&m->logname);
+        av_opt_free(m);
+        av_freep(&m);
+        // XXX pipelines
+    }
     nmdi_log_free(&s->log_ctx);
-    av_opt_free(s);
     av_freep(&s);
 }
 
@@ -172,6 +192,36 @@ static void free_temp_context_data(struct nmd_ctx *s)
 void nmd_set_log_callback(struct nmd_ctx *s, void *arg, nmd_log_callback_type callback)
 {
     nmdi_log_set_callback(s->log_ctx, arg, callback);
+}
+
+struct nmd_media *nmd_add_media(struct nmd_ctx *ctx, const char *filename)
+{
+    struct nmd_media *s = av_mallocz(sizeof(*s));
+    if (!s)
+        return NULL;
+
+    s->filename = av_strdup(filename);
+    s->logname  = av_asprintf("nope.media:%s", av_basename(filename));
+    if (!s->filename || !s->logname)
+        goto fail;
+
+    s->class = &class;
+
+    av_opt_set_defaults(s);
+
+    s->last_ts              = AV_NOPTS_VALUE;
+    s->first_ts             = AV_NOPTS_VALUE;
+    s->last_frame_poped_ts  = AV_NOPTS_VALUE;
+    s->last_pushed_frame_ts = AV_NOPTS_VALUE;
+
+    av_assert0(!s->context_configured); // XXX
+    return s;
+
+fail:
+    free_context(s);
+    return NULL;
+
+    return s;
 }
 
 struct nmd_ctx *nmd_create(const char *filename)
@@ -193,12 +243,7 @@ struct nmd_ctx *nmd_create(const char *filename)
     if (!s)
         return NULL;
 
-    s->filename = av_strdup(filename);
-    s->logname  = av_asprintf("nope.media:%s", av_basename(filename));
-    if (!s->filename || !s->logname)
-        goto fail;
-
-    s->class = &class;
+    s->class = &ctx_class;
 
     av_log_set_level(LOG_LEVEL);
 
@@ -221,14 +266,7 @@ struct nmd_ctx *nmd_create(const char *filename)
 
     avformat_network_init();
 
-    av_opt_set_defaults(s);
-
-    s->last_ts              = AV_NOPTS_VALUE;
-    s->first_ts             = AV_NOPTS_VALUE;
-    s->last_frame_poped_ts  = AV_NOPTS_VALUE;
-    s->last_pushed_frame_ts = AV_NOPTS_VALUE;
-
-    av_assert0(!s->context_configured);
+    // av_assert0(!s->context_configured);
     return s;
 
 fail:
@@ -259,7 +297,7 @@ static int64_t get_media_time(const struct nmdi_opts *o, int64_t t)
     return o->end_time64 == AV_NOPTS_VALUE ? mt : FFMIN(mt, o->end_time64);
 }
 
-static int set_context_fields(struct nmd_ctx *s)
+static int set_context_fields(struct nmd_media *s)
 {
     struct nmdi_opts *o = &s->opts;
 
@@ -319,7 +357,7 @@ static int set_context_fields(struct nmd_ctx *s)
  * it requires user option to be set, which is done between the context
  * allocation and the first call to nmd_get_*frame() or nmd_get_duration().
  */
-static int configure_context(struct nmd_ctx *s)
+static int configure_context(struct nmd_media *s)
 {
     if (s->context_configured)
         return 1;
@@ -328,7 +366,7 @@ static int configure_context(struct nmd_ctx *s)
     int ret = set_context_fields(s);
     if (ret < 0) {
         LOG(s, ERROR, "Unable to set context fields: %s", av_err2str(ret));
-        free_temp_context_data(s);
+        // free_temp_context_data(s);
         return ret;
     }
 
@@ -460,7 +498,7 @@ static int get_nmd_col_trc(int avcol_trc)
 /* Return the frame only if different from previous one. We do not make a
  * simple pointer check because of the frame reference counting (and thus
  * pointer reuse, depending on many parameters)  */
-static struct nmd_frame *ret_frame(struct nmd_ctx *s, AVFrame *frame)
+static struct nmd_frame *ret_frame(struct nmd_media *s, AVFrame *frame)
 {
     struct nmd_frame *ret = NULL;
     const struct nmdi_opts *o = &s->opts;
@@ -541,7 +579,7 @@ void nmd_release_frame(struct nmd_frame *frame)
     }
 }
 
-static AVFrame *pop_frame(struct nmd_ctx *s)
+static AVFrame *pop_frame(struct nmd_media *s)
 {
     AVFrame *frame = NULL;
 
@@ -594,7 +632,7 @@ static AVFrame *pop_frame(struct nmd_ctx *s)
 #define SYNTH_FRAME 0
 
 #if SYNTH_FRAME
-static struct nmd_frame *ret_synth_frame(struct nmd_ctx *s, int64_t t64)
+static struct nmd_frame *ret_synth_frame(struct nmd_media *s, int64_t t64)
 {
     AVFrame *frame = av_frame_alloc();
     const int frame_id = lrint(t64 * 60 / 1000000);
@@ -611,7 +649,7 @@ static struct nmd_frame *ret_synth_frame(struct nmd_ctx *s, int64_t t64)
 }
 #endif
 
-int nmd_seek(struct nmd_ctx *s, double reqt)
+int nmd_seek(struct nmd_media *s, double reqt)
 {
     START_FUNC_T("SEEK", reqt);
 
@@ -628,7 +666,7 @@ int nmd_seek(struct nmd_ctx *s, double reqt)
     return ret;
 }
 
-int nmd_stop(struct nmd_ctx *s)
+int nmd_stop(struct nmd_media *s)
 {
     START_FUNC("STOP");
 
@@ -644,7 +682,7 @@ int nmd_stop(struct nmd_ctx *s)
     return ret;
 }
 
-int nmd_start(struct nmd_ctx *s)
+int nmd_start(struct nmd_media *s)
 {
     START_FUNC("START");
 

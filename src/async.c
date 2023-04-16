@@ -43,8 +43,9 @@ struct info_message {
     AVRational timebase;
 };
 
-struct async_context {
-    void *log_ctx;
+struct async_media {
+    struct async_context *ctx;
+
     const char *filename;
     const struct nmdi_opts *o;
 
@@ -55,12 +56,10 @@ struct async_context {
     pthread_t demuxer_tid;
     pthread_t decoder_tid;
     pthread_t filterer_tid;
-    pthread_t control_tid;
 
     int demuxer_started;
     int decoder_started;
     int filterer_started;
-    int control_started;
 
     AVThreadMessageQueue *src_queue;        // user     <-> demuxer
     AVThreadMessageQueue *pkt_queue;        // demuxer  <-> decoder
@@ -82,6 +81,15 @@ struct async_context {
     int need_sync;
 
     int playing;
+};
+
+struct async_context {
+    void *log_ctx;
+    pthread_t control_tid;
+    int control_started;
+
+    struct async_media *medias;
+    size_t nb_medias;
 };
 
 /* Send a message to the control input and fetch from the output until we get

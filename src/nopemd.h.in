@@ -200,10 +200,8 @@ struct nmd_info {
 
 /**
  * Create media player context
- *
- * @param filename media input file name
  */
-NMDAPI struct nmd_ctx *nmd_create(const char *filename);
+NMDAPI struct nmd_ctx *nmd_create();
 
 /**
  * Type of the user log callback
@@ -231,6 +229,10 @@ typedef void (*nmd_log_callback_type)(void *arg, int level, const char *filename
  * @param callback  custom user logging callback
  */
 NMDAPI void nmd_set_log_callback(struct nmd_ctx *s, void *arg, nmd_log_callback_type callback);
+
+struct nmd_media;
+
+NMDAPI struct nmd_media *nmd_add_media(struct nmd_ctx *s, const char *filename);
 
 /**
  * Set an option.
@@ -261,19 +263,19 @@ NMDAPI void nmd_set_log_callback(struct nmd_ctx *s, void *arg, nmd_log_callback_
  *   stream_idx               integer   force a stream number instead of picking the "best" one (note: stream MUST be of type avselect)
  *   use_pkt_duration         integer   use packet duration instead of decoding the next frame to get the next frame pts
  */
-NMDAPI int nmd_set_option(struct nmd_ctx *s, const char *key, ...);
+NMDAPI int nmd_media_set_option(struct nmd_media *s, const char *key, ...);
 
 /**
  * Get the media duration (clipped to end_time if set).
  *
  * The duration is expressed in seconds.
  */
-NMDAPI int nmd_get_duration(struct nmd_ctx *s, double *duration);
+NMDAPI int nmd_media_get_duration(struct nmd_media *s, double *duration);
 
 /**
  * Get various information on the media.
  */
-NMDAPI int nmd_get_info(struct nmd_ctx *s, struct nmd_info *info);
+NMDAPI int nmd_media_get_info(struct nmd_media *s, struct nmd_info *info);
 
 /**
  * Get the frame at an absolute time.
@@ -291,12 +293,12 @@ NMDAPI int nmd_get_info(struct nmd_ctx *s, struct nmd_info *info);
  * The function is blocking, it will make sure any asynchronous operation
  * previously requested (start, seek, stop) is honored before returning.
  */
-NMDAPI struct nmd_frame *nmd_get_frame(struct nmd_ctx *s, double t);
+NMDAPI struct nmd_frame *nmd_media_get_frame(struct nmd_media *s, double t);
 
 /**
  * Same as nmd_get_frame, but with timestamp expressed in microseconds.
  */
-NMDAPI struct nmd_frame *nmd_get_frame_ms(struct nmd_ctx *s, int64_t ms);
+NMDAPI struct nmd_frame *nmd_media_get_frame_ms(struct nmd_media *s, int64_t ms);
 
 /**
  * Request a playback start to the player.
@@ -306,7 +308,7 @@ NMDAPI struct nmd_frame *nmd_get_frame_ms(struct nmd_ctx *s, int64_t ms);
  *
  * Return 0 on success, a negative value on error.
  */
-NMDAPI int nmd_start(struct nmd_ctx *s);
+NMDAPI int nmd_media_start(struct nmd_media *s);
 
 /**
  * Request a stop to the player to liberate playback ressources.
@@ -316,7 +318,7 @@ NMDAPI int nmd_start(struct nmd_ctx *s);
  *
  * Return 0 on success, a negative value on error.
  */
-NMDAPI int nmd_stop(struct nmd_ctx *s);
+NMDAPI int nmd_media_stop(struct nmd_media *s);
 
 /**
  * Request a seek to the player at a given time.
@@ -328,7 +330,7 @@ NMDAPI int nmd_stop(struct nmd_ctx *s);
  *
  * Return 0 on success, a negative value on error.
  */
-NMDAPI int nmd_seek(struct nmd_ctx *s, double t);
+NMDAPI int nmd_media_seek(struct nmd_media *s, double t);
 
 /**
  * Get the next frame.
@@ -343,7 +345,7 @@ NMDAPI int nmd_seek(struct nmd_ctx *s, double t);
  * interested in. You can still use this function in combination with
  * nmd_get_frame() in case you need seeking.
  */
-NMDAPI struct nmd_frame *nmd_get_next_frame(struct nmd_ctx *s);
+NMDAPI struct nmd_frame *nmd_media_get_next_frame(struct nmd_media *s);
 
 /* Release a frame obtained with nmd_get_frame() */
 NMDAPI void nmd_release_frame(struct nmd_frame *frame);

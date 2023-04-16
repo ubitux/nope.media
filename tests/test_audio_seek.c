@@ -15,9 +15,13 @@ int main(int ac, char **av)
 
     int ret = 0;
     double last_ts = 0.0;
-    struct nmd_ctx *s = nmd_create(filename);
     struct nmd_frame *frame = NULL;
 
+    struct nmd_ctx *ctx = nmd_create();
+    if (!ctx)
+        return -1;
+
+    struct nmd_media *s = nmd_add_media(ctx, filename);
     if (!s)
         return -1;
 
@@ -52,7 +56,7 @@ int main(int ac, char **av)
         ret = -1;
     }
     nmd_release_frame(frame);
-    nmd_free(&s);
+    nmd_free(&ctx);
 
     return ret;
 }

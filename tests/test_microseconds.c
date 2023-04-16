@@ -14,8 +14,12 @@ int main(int ac, char **av)
     const char *filename = av[1];
     const int use_pkt_duration = ac > 2 ? atoi(av[2]) : 0;
 
-    struct nmd_ctx *s1 = nmd_create(filename);
-    struct nmd_ctx *s2 = nmd_create(filename);
+    struct nmd_ctx *ctx = nmd_create();
+    if (!ctx)
+        return -1;
+
+    struct nmd_media *s1 = nmd_add_media(ctx, filename);
+    struct nmd_media *s2 = nmd_add_media(ctx, filename);
     struct nmd_frame *f1, *f2;
 
     if (!s1 || !s2)
@@ -42,7 +46,6 @@ int main(int ac, char **av)
 
     nmd_release_frame(f1);
     nmd_release_frame(f2);
-    nmd_free(&s1);
-    nmd_free(&s2);
+    nmd_free(&ctx);
     return 0;
 }

@@ -27,6 +27,8 @@
 #include "opts.h"
 #include "msg.h"
 
+struct async_context;
+
 const char *nmdi_async_get_msg_type_string(enum msg_type type);
 
 void nmdi_msg_free_data(void *arg);

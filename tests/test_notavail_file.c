@@ -17,16 +17,20 @@ int main(int ac, char **av)
 {
     const int use_pkt_duration = ac > 1 ? atoi(av[1]) : 0;
 
-    struct nmd_ctx *s = nmd_create(fake_filename);
+    struct nmd_ctx *ctx = nmd_create();
+    if (!ctx)
+        return -1;
 
+    struct nmd_media *s = nmd_add_media(ctx, fake_filename);
     if (!s)
         return -1;
+    
     nmd_set_option(s, "auto_hwaccel", 0);
     nmd_set_option(s, "use_pkt_duration", use_pkt_duration);
     nmd_set_log_callback(s, (void*)fake_filename, log_callback);
     nmd_release_frame(nmd_get_frame(s, -1));
     nmd_release_frame(nmd_get_frame(s, 1.0));
     nmd_release_frame(nmd_get_frame(s, 3.0));
-    nmd_free(&s);
+    nmd_free(&ctx);
     return 0;
 }

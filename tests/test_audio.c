@@ -14,10 +14,12 @@ int main(int ac, char **av)
     const int use_pkt_duration = ac > 2 ? atoi(av[2]) : 0;
 
     int i = 0, ret = 0, smp = 0;
-    struct nmd_ctx *s = nmd_create(filename);
 
-    if (!s)
+    struct nmd_ctx *ctx = nmd_create();
+    if (!ctx)
         return -1;
+
+    struct nmd_media *m = nmd_add_media(ctx, filename);
 
     nmd_set_option(s, "auto_hwaccel", 0);
     nmd_set_option(s, "use_pkt_duration", use_pkt_duration);
@@ -27,7 +29,7 @@ int main(int ac, char **av)
     for (int r = 0; r < 2; r++) {
         printf("run #%d\n", r+1);
         for (;;) {
-            struct nmd_frame *frame = nmd_get_next_frame(s);
+            struct nmd_frame *frame = nmd_media_get_next_frame(s);
 
             if (!frame) {
                 printf("null frame\n");
@@ -41,7 +43,7 @@ int main(int ac, char **av)
         }
     }
 
-    nmd_free(&s);
+    nmd_free(&ctx);
 
     if (smp != 15876000) {
         fprintf(stderr, "decoded %d/15876000 expected samples\n", smp);

@@ -13,7 +13,14 @@ int main(int ac, char **av)
     const char *filename = av[1];
     const int use_pkt_duration = ac > 2 ? atoi(av[2]) : 0;
 
-    struct nmd_ctx *s = nmd_create(filename);
+    struct nmd_ctx *ctx = nmd_create(filename);
+    if (!ctx)
+        return -1;
+
+    struct nmd_media *s = nmd_add_media(ctx, filename);
+    if  (!s)
+        return -1;
+
     nmd_set_option(s, "auto_hwaccel", 0);
     nmd_set_option(s, "use_pkt_duration", use_pkt_duration);
     struct nmd_frame *f;
@@ -32,6 +39,6 @@ int main(int ac, char **av)
         nmd_release_frame(f);
         return -1;
     }
-    nmd_free(&s);
+    nmd_free(&ctx);
     return 0;
 }

@@ -14,8 +14,12 @@ int main(int ac, char **av)
     const int use_pkt_duration = ac > 2 ? atoi(av[2]) : 0;
 
     int i = 0, ret = 0;
-    struct nmd_ctx *s = nmd_create(filename);
 
+    struct nmd_ctx *ctx = nmd_create();
+    if (!ctx)
+        return -1;
+
+    struct nmd_media *s = nmd_add_media(ctx, filename);
     if (!s)
         return -1;
 
@@ -39,7 +43,7 @@ int main(int ac, char **av)
         }
     }
 
-    nmd_free(&s);
+    nmd_free(&ctx);
 
     if (i != 8192) {
         fprintf(stderr, "decoded %d/8192 expected frames\n", i);

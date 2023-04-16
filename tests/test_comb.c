@@ -16,7 +16,7 @@ enum action {
     NB_ACTIONS
 };
 
-static int action_prefetch(struct nmd_ctx *s, int opt_test_flags)
+static int action_prefetch(struct nmd_media *s, int opt_test_flags)
 {
     return nmd_start(s);
 }
@@ -25,7 +25,7 @@ static int action_prefetch(struct nmd_ctx *s, int opt_test_flags)
 #define FLAG_END_TIME      (1<<1)
 #define FLAG_AUDIO         (1<<2)
 
-static int action_fetch_info(struct nmd_ctx *s, int opt_test_flags)
+static int action_fetch_info(struct nmd_media *s, int opt_test_flags)
 {
     struct nmd_info info;
     int ret = nmd_get_info(s, &info);
@@ -97,7 +97,7 @@ static int check_frame(struct nmd_frame *f, double t, int opt_test_flags)
     return 0;
 }
 
-static int action_start(struct nmd_ctx *s, int opt_test_flags)
+static int action_start(struct nmd_media *s, int opt_test_flags)
 {
     int ret;
     struct nmd_frame *frame = nmd_get_frame(s, 0);
@@ -108,7 +108,7 @@ static int action_start(struct nmd_ctx *s, int opt_test_flags)
     return 0;
 }
 
-static int action_middle(struct nmd_ctx *s, int opt_test_flags)
+static int action_middle(struct nmd_media *s, int opt_test_flags)
 {
     int ret;
     struct nmd_frame *f0 = nmd_get_frame(s, 30.0);
@@ -154,7 +154,7 @@ static int action_middle(struct nmd_ctx *s, int opt_test_flags)
     return 0;
 }
 
-static int action_end(struct nmd_ctx *s, int opt_test_flags)
+static int action_end(struct nmd_media *s, int opt_test_flags)
 {
     struct nmd_frame *f;
 
@@ -202,7 +202,11 @@ static void print_comb_name(uint64_t comb, int opt_test_flags)
 static int exec_comb(const char *filename, uint64_t comb, int opt_test_flags, int use_pkt_duration)
 {
     int ret = 0;
-    struct nmd_ctx *s = nmd_create(filename);
+    struct nmd_ctx *ctx = nmd_create();
+    if (!ctx)
+        return -1;
+
+    struct nmd_media *s = nmd_add_media(ctx, filename);
     if (!s)
         return -1;
 
@@ -224,7 +228,7 @@ static int exec_comb(const char *filename, uint64_t comb, int opt_test_flags, in
             break;
     }
 
-    nmd_free(&s);
+    nmd_free(&ctx);
     return ret;
 }
 
